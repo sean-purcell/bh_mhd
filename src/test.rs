@@ -8,6 +8,15 @@ fn main() {
     let bh = bh_mhd::BhMhd::new(&display);
     loop {
         bh.test_render();
+        display.finish();
+
+        for ev in display.poll_events() {
+            use glium::glutin::Event::*;
+            match ev {
+                Closed => return,
+                _ => (),
+            }
+        }
     }
 }
 
