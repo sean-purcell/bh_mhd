@@ -1,17 +1,15 @@
 extern crate bh_mhd;
 extern crate glium;
+extern crate time;
 
 use glium::{glutin,DisplayBuild};
 
 fn main() {
     let display = build_display();
- //   let bh = bh_mhd::BhMhd::new(&display);
-    let mut a = 0i32;
+    let sim = bh_mhd::Sim::new(&display);
     loop {
-   //     bh.test_render();
+        sim.test_render();
         display.finish();
-        println!("rendered {}", a);
-        a+=1;
 
         for ev in display.poll_events() {
             use glium::glutin::Event::*;
