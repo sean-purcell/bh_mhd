@@ -18,16 +18,6 @@ pub struct Sim<'a> {
     cover_buffers: (VertexBufferAny,IndexBufferAny),
 }
 
-struct SimData {
-    layers: (Vec<Layer>, Vec<Layer>),
-    iter: RefCell<i32>,
-}
-
-struct Layer {
-    v_p: Texture2d,
-    b: Texture2d,
-}
-
 impl<'a> Sim<'a> {
     pub fn new(f: &'a Display) -> Self {
         Sim {
@@ -43,10 +33,9 @@ impl<'a> Sim<'a> {
         let (vert_buf, ind_buf) = cover_buffers(self.facade);
 
         let layers = &self.data.layers;
-        let index = rand::random::<usize>() % self.data.layers.0.len();
 
-        let tex1 = &layers.0[index].v_p;
-        let tex2 = &layers.0[index].b;
+        let tex1 = &layers.0.v_p;
+        let tex2 = &layers.0.b;
         let mut fbo = {
             let outputs = [("v_p", tex1), ("b", tex2)];
             MultiOutputFrameBuffer::new(self.facade, outputs.iter().cloned()).unwrap()
@@ -77,39 +66,55 @@ impl<'a> Sim<'a> {
         let front = self.data.front_layer();
         let back = self.data.back_layer();
 
-        for i in 0..front.len() {
-            let layer = &front[i];
-            let outputs = [("v_p", &layer.v_p), ("b", &layer.b)];
-            let mut fbo = MultiOutputFrameBuffer::new(self.facade, outputs.iter().cloned()).unwrap();
+        let outputs = [("v_p", &front.v_p), ("b", &front.b)];
+        let mut fbo = MultiOutputFrameBuffer::new(self.facade,
+            outputs.iter().cloned()).unwrap();
 
-            let bufs = &self.cover_buffers;
-            fbo.draw(&bufs.0, &bufs.1, &self.sim_prog,
-                &uniforms::EmptyUniforms, &Default::default()).unwrap();
-        }
+        let bufs = &self.cover_buffers;
+        fbo.draw(&bufs.0, &bufs.1, &self.sim_prog,
+            &uniforms::EmptyUniforms, &Default::default()).unwrap();
 
         self.data.next_iter();
     }
 }
 
+struct SimData {
+    layers: (Layer, Layer),
+    dimensions: SimDimensions,
+    iter: RefCell<i32>,
+}
+
+struct SimDimensions {
+    angs: u32,
+    rads: u32,
+    levs: u32,
+}
+
 impl SimData {
     fn new(f: &Display) -> Self {
-        let layers = {
+        let dims = {
             let ang_num = 100u32;
             let rad_num = 100u32;
             let lev_num = 100u32;
 
-            ((0..lev_num)
-                .map(|_| Layer::new(f, ang_num, rad_num))
-                .collect(),
-             (0..lev_num)
-                .map(|_| Layer::new(f, ang_num, rad_num))
-                .collect(),)
+            SimDimensions {
+                angs: ang_num,
+                rads: rad_num,
+                levs: lev_num,
+            }
         };
 
-        SimData { layers: layers, iter: RefCell::new(0) }
+        let layers = {
+            (Layer::new(f, dims.angs, dims.rads, dims.levs),
+            Layer::new(f, dims.angs, dims.rads, dims.levs))
+        };
+
+        SimData { layers: layers,
+            dimensions: dims,
+            iter: RefCell::new(0) }
     }
 
-    fn front_layer(&self) -> &Vec<Layer> {
+    fn front_layer(&self) -> &Layer {
         if *self.iter.borrow() % 2 == 0 {
             &self.layers.0
         } else {
@@ -117,7 +122,7 @@ impl SimData {
         }
     }
 
-    fn back_layer(&self) -> &Vec<Layer> {
+    fn back_layer(&self) -> &Layer {
         if *self.iter.borrow() % 2 == 1 {
             &self.layers.0
         } else {
@@ -130,16 +135,21 @@ impl SimData {
     }
 }
 
+struct Layer {
+    v_p: Texture2d,
+    b: Texture2d,
+}
+
 impl Layer {
-    fn new(f: &Display, width: u32, height: u32) -> Self {
+    fn new(f: &Display, width: u32, height: u32, depth: u32) -> Self {
         let format = glium::texture::UncompressedFloatFormat::F32F32F32F32;
         let mipmaps = glium::texture::MipmapsOption::NoMipmap;
 
         Layer {
             v_p: Texture2d::empty_with_format(f,
-                format, mipmaps, width, height).unwrap(),
+                format, mipmaps, width * depth, height).unwrap(),
             b: Texture2d::empty_with_format(f,
-                format, mipmaps, width, height).unwrap(),
+                format, mipmaps, width * depth, height).unwrap(),
         }
     }
 }
