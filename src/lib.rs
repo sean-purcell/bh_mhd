@@ -15,10 +15,12 @@ pub struct Sim<'a> {
     facade: &'a Display,
     data: SimData,
     sim_prog: Program,
+    cover_buffers: (VertexBufferAny,IndexBufferAny),
 }
 
 struct SimData {
     layers: (Vec<Layer>, Vec<Layer>),
+    iter: RefCell<i32>,
 }
 
 struct Layer {
@@ -32,6 +34,7 @@ impl<'a> Sim<'a> {
             facade: f,
             data: SimData::new(f),
             sim_prog: test_program(f),
+            cover_buffers: cover_buffers(f),
         }
     }
 
@@ -68,6 +71,24 @@ impl<'a> Sim<'a> {
             uniforms::MagnifySamplerFilter::Nearest);
         target.finish().unwrap();
     }
+
+    pub fn iteration(&self, dt: f32) {
+        use glium::{Surface,uniforms};
+        let front = self.data.front_layer();
+        let back = self.data.back_layer();
+
+        for i in 0..front.len() {
+            let layer = &front[i];
+            let outputs = [("v_p", &layer.v_p), ("b", &layer.b)];
+            let mut fbo = MultiOutputFrameBuffer::new(self.facade, outputs.iter().cloned()).unwrap();
+
+            let bufs = &self.cover_buffers;
+            fbo.draw(&bufs.0, &bufs.1, &self.sim_prog,
+                &uniforms::EmptyUniforms, &Default::default()).unwrap();
+        }
+
+        self.data.next_iter();
+    }
 }
 
 impl SimData {
@@ -85,7 +106,27 @@ impl SimData {
                 .collect(),)
         };
 
-        SimData { layers: layers }
+        SimData { layers: layers, iter: RefCell::new(0) }
+    }
+
+    fn front_layer(&self) -> &Vec<Layer> {
+        if *self.iter.borrow() % 2 == 0 {
+            &self.layers.0
+        } else {
+            &self.layers.1
+        }
+    }
+
+    fn back_layer(&self) -> &Vec<Layer> {
+        if *self.iter.borrow() % 2 == 1 {
+            &self.layers.0
+        } else {
+            &self.layers.1
+        }
+    }
+
+    fn next_iter(&self) {
+        *self.iter.borrow_mut() += 1;
     }
 }
 
