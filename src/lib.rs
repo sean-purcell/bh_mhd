@@ -13,7 +13,7 @@ use glium::framebuffer::MultiOutputFrameBuffer;
 
 pub struct Sim<'a> {
     facade: &'a Display,
-    data: SimData,
+    data: Data,
     sim_prog: Program,
     cover_buffers: (VertexBufferAny,IndexBufferAny),
 }
@@ -22,7 +22,7 @@ impl<'a> Sim<'a> {
     pub fn new(f: &'a Display) -> Self {
         Sim {
             facade: f,
-            data: SimData::new(f),
+            data: Data::new(f),
             sim_prog: test_program(f),
             cover_buffers: cover_buffers(f),
         }
@@ -78,7 +78,7 @@ impl<'a> Sim<'a> {
     }
 }
 
-struct SimData {
+struct Data {
     layers: (Layer, Layer),
     dimensions: SimDimensions,
     iter: RefCell<i32>,
@@ -90,7 +90,7 @@ struct SimDimensions {
     levs: u32,
 }
 
-impl SimData {
+impl Data {
     fn new(f: &Display) -> Self {
         let dims = {
             let ang_num = 100u32;
@@ -109,7 +109,7 @@ impl SimData {
             Layer::new(f, dims.angs, dims.rads, dims.levs))
         };
 
-        SimData { layers: layers,
+        Data { layers: layers,
             dimensions: dims,
             iter: RefCell::new(0) }
     }
