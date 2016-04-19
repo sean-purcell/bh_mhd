@@ -25,7 +25,7 @@ impl<'a> Sim<'a> {
     }
 
     pub fn test_render(&self) {
-        use glium::{Surface,Rect,BlitTarget,uniforms};
+        use glium::{Surface,uniforms};
 
         let layers = &self.data.layers;
 
@@ -34,16 +34,11 @@ impl<'a> Sim<'a> {
 
         let target = self.facade.draw();
 
-        let (s_width, s_height) = fbo.get_dimensions();
-        let (t_width, t_height) = target.get_dimensions();
-        target.blit_from_simple_framebuffer(&fbo,
-            &Rect {left: 0, bottom: 0, width: s_width, height: s_height},
-            &BlitTarget {left: 0, bottom: 0, width: t_width as i32, height: t_height as i32},
-            uniforms::MagnifySamplerFilter::Nearest);
+        fbo.fill(&target, uniforms::MagnifySamplerFilter::Nearest);
         target.finish().unwrap();
     }
 
-    pub fn iteration(&self, dt: f32) {
+    pub fn iteration(&self, dt: f32, t: f32) {
         use glium::Surface;
         use glium::uniforms::{MinifySamplerFilter,MagnifySamplerFilter};
 
@@ -65,7 +60,7 @@ impl<'a> Sim<'a> {
             tex_b: back.b.sampled()
                 .minify_filter(MinifySamplerFilter::Nearest)
                 .magnify_filter(MagnifySamplerFilter::Nearest),
-        };/* here because returning Uniforms is very hard */
+        };/* here because returning Uniforms is very hard :( */
 
         let bufs = &self.shaders.buffers;
         fbo.draw(&bufs.0, &bufs.1, &self.shaders.initialize,

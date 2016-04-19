@@ -113,7 +113,8 @@ fn cover_buffers<F>(f: &F) -> (VertexBufferAny, IndexBufferAny)
             Vertex { uv: (-1.0,  1.0) }, Vertex { uv: (1.0,  1.0) },
             Vertex { uv: (-1.0, -1.0) }, Vertex { uv: (1.0, -1.0) },
         ]).unwrap().into(),
-        IndexBuffer::new(f, PrimitiveType::TriangleStrip, &[0u8, 1, 2, 3]).unwrap().into()
+        IndexBuffer::new(f, PrimitiveType::TriangleStrip,
+            &[0u8, 1, 2, 3]).unwrap().into()
     )
 }
 
@@ -132,13 +133,28 @@ mod initial_conditions {
         {preamble}
 
         void main() {{
-            /* for testing purposes */
-            float x = fract(pos.x * levs * angs + 0.5);
-            float y = fract(pos.y * rads + 0.5);
-            v_p = b = vec4(x, y, 0.0, 1.0);
+            uint rind = uint(pos.y * rads + 0.5);
+            uint lind = uint(pos.x * levs + 0.5);
+            uint aind = uint(fract(pos.x * levs) * angs + 0.5);
+
+
+            /* setup the initial conditions */
+            {init}
         }}"#,
-        preamble = ::simulate::FRAG_PREAMBLE)
+        preamble = ::simulate::FRAG_PREAMBLE,
+        init = INIT)
     }
+
+    const INIT: &'static str = r#"
+        float waves = 5;
+        float ang = (rind / float(rads) +
+                    lind / float(levs) +
+                    aind / float(angs)) * waves * 2 * M_PI;
+        float s = sin(ang);
+        float c = cos(ang);
+        v_p = vec4(s, s, s, 1.0);
+        b = vec4(c, c, c, 1.0);
+    "#;
 }
 
 const VERT_SHADER: &'static str = r#"
@@ -154,6 +170,7 @@ const VERT_SHADER: &'static str = r#"
 
 const FRAG_PREAMBLE: &'static str = r#"
     #version 330
+    #define M_PI 3.1415926535897932384626433832795
     uniform uint rads; /* texture height */
     uniform uint angs; /* texture width per section */
     uniform uint levs; /* texture section count */
@@ -165,5 +182,9 @@ const FRAG_PREAMBLE: &'static str = r#"
 
     layout(location = 0) out vec4 v_p;
     layout(location = 1) out vec4 b;
+
+    vec4 lookup(sampler2D tex, uint rind, uint lind, uint aind) {
+        return texelFetch(tex, ivec2(lind * levs + aind, rind), 0);
+    }
 "#;
 
