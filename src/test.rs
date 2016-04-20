@@ -6,7 +6,10 @@ use glium::{glutin,DisplayBuild};
 
 fn main() {
     let display = build_display();
+
     let sim = bh_mhd::Sim::new(&display);
+    sim.initial();
+
     let mut prev_time = time::precise_time_ns();
     loop {
         let (dt, cur_time) = {

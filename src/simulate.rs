@@ -1,6 +1,7 @@
 extern crate glium;
 
 use std::cell::RefCell;
+use std::fmt;
 
 use glium::{Program,VertexBuffer,IndexBuffer,Display};
 use glium::framebuffer::MultiOutputFrameBuffer;
@@ -111,6 +112,12 @@ impl Layer {
             b: Texture2d::empty_with_format(f,
                 format, mipmaps, width * depth, height).unwrap(),
         }
+    }
+}
+
+impl fmt::Debug for Layer {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Layer: ({:?}, {:?})", self.v_p, self.b)
     }
 }
 
