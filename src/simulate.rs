@@ -67,7 +67,7 @@ impl Data {
     }
 
     pub fn draw(&self, f: &Display, program: &Program,
-        buffers: &(VertexBufferAny, IndexBufferAny)) {
+        buffers: &(VertexBufferAny, IndexBufferAny), dt: f32) {
         use glium::Surface;
         use glium::uniforms::{MinifySamplerFilter,MagnifySamplerFilter};
 
@@ -82,13 +82,14 @@ impl Data {
             rads: self.dimensions.rads,
             angs: self.dimensions.angs,
             levs: self.dimensions.levs,
+            dt: dt,
             tex_v_p: back.v_p.sampled()
                 .minify_filter(MinifySamplerFilter::Nearest)
                 .magnify_filter(MagnifySamplerFilter::Nearest),
             tex_b: back.b.sampled()
                 .minify_filter(MinifySamplerFilter::Nearest)
                 .magnify_filter(MagnifySamplerFilter::Nearest),
-        };/* here because returning Uniforms is very hard :( */
+        };
 
         fbo.draw(&buffers.0, &buffers.1, program,
             &uniforms, &Default::default()).unwrap();
@@ -160,17 +161,17 @@ fn cover_buffers<F>(f: &F) -> (VertexBufferAny, IndexBufferAny)
 mod sim_code {
     use glium::{Display,Program};
     pub fn initial(f: &Display) -> Program {
-        Program::from_source(f,
+        ::check_program(Program::from_source(f,
             VERT_SHADER,
             &initial_frag_shader(),
-            None).unwrap()
+            None))
     }
 
     pub fn update(f: &Display) -> Program {
-        Program::from_source(f,
+        ::check_program(Program::from_source(f,
             VERT_SHADER,
             &update_frag_shader(),
-            None).unwrap()
+            None))
     }
 
     fn initial_frag_shader() -> String {
@@ -182,20 +183,40 @@ mod sim_code {
     }
 
     const INIT: &'static str = r#"
-        float ang = (rind / float(rads) +
-                     lind / float(rads) +
-                     aind/float(angs)) * 2 * M_PI;
-        float s = sin(ang);
-        float c = cos(ang);
-        v_p = vec4(s, s, s, 1.0);
-        b = vec4(c, c, c, 1.0);
+        float val;
+        if(abs(rind - int(rads)/2) <= 2 && abs(lind - int(levs)/2) <= 2 && abs(aind - int(angs)/2) <= 2) {
+            val = 10;
+        } else {
+            val = 0;
+        }
+
+        v_p = vec4(val, val, val, 1.0);
+        b = vec4(0, 0, 0, 0);
     "#;
 
     const UPDATE: &'static str = r#"
         /* take v_p as value, b as derivative */
 
-        v_p = lookup(tex_v_p, wrap(rind-1, rads), lind, aind);
-        b = lookup(tex_b, wrap(rind-1, rads), lind, aind);
+        #define VAL(r, l, a) (lookup(tex_v_p, r, l, a).g)
+
+        float div2 = (
+            (-VAL(wrap(rind-2, rads), lind, aind) + VAL(wrap(rind-1, rads), lind, aind)*16
+             -VAL(wrap(rind+2, rads), lind, aind) + VAL(wrap(rind+1, rads), lind, aind)*16) +
+            (-VAL(rind, wrap(lind-2, levs), aind) + VAL(rind, wrap(lind-1, levs), aind)*16
+             -VAL(rind, wrap(lind+2, levs), aind) + VAL(rind, wrap(lind+1, levs), aind)*16) +
+            (-VAL(rind, lind, wrap(aind-2, angs)) + VAL(rind, lind, wrap(aind-1, angs))*16
+             -VAL(rind, lind, wrap(aind+2, angs)) + VAL(rind, lind, wrap(aind+1, angs))*16) +
+            -VAL(rind, lind, aind) * 30) / 12;
+
+        #undef VAL
+
+        float x = lookup(tex_v_p, rind, lind, aind).r;
+        float v = lookup(tex_b, rind, lind, aind).r;
+        float nx = x + v * dt;
+        float nv = v + div2 * dt * 343;
+
+        v_p = vec4(nx, nx, nx, 1.0);
+        b = vec4(nv, nv, nv, 1.0);
     "#;
 
     const VERT_SHADER: &'static str = r#"
@@ -218,6 +239,8 @@ mod sim_code {
 
         in vec2 uv;
 
+        uniform float dt;
+
         uniform sampler2D tex_v_p;
         uniform sampler2D tex_b;
 
@@ -226,6 +249,16 @@ mod sim_code {
 
         vec4 lookup(sampler2D tex, int rind, int lind, int aind) {
             return texelFetch(tex, ivec2(lind * int(levs) + aind, rind), 0);
+        }
+
+        vec3 v_f(vec4 v_p) {
+            return vec3(v_p);
+        }
+        float p_f(vec4 v_p) {
+            return v_p.w;
+        }
+        vec3 b_f(vec4 b) {
+            return vec3(b);
         }
 
         int wrap(int ind, uint max) {
