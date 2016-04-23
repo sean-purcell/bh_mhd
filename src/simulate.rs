@@ -25,9 +25,9 @@ pub struct SimDimensions {
 impl Data {
     pub fn new(f: &Display) -> Self {
         let dims = {
-            let ang_num = 100u32;
-            let rad_num = 100u32;
-            let lev_num = 100u32;
+            let ang_num = 500u32;
+            let rad_num = 500u32;
+            let lev_num = 2u32;
 
             SimDimensions {
                 angs: ang_num,
@@ -183,15 +183,17 @@ mod sim_code {
     }
 
     const INIT: &'static str = r#"
-        float val;
-        if(abs(rind - int(rads)/2) <= 2 && abs(lind - int(levs)/2) <= 2 && abs(aind - int(angs)/2) <= 2) {
-            val = 10;
+        float x, v;
+        if(abs(rind - int(rads)/2) <= 1 && abs(lind - int(levs)/2) <= 1 && abs(aind - int(angs)/2) <= 1) {
+            x = 10;
+            v = 0;
         } else {
-            val = 0;
+            x = 0;
+            v = 0;
         }
 
-        v_p = vec4(val, val, val, 1.0);
-        b = vec4(0, 0, 0, 0);
+        v_p = vec4(x, x, x, 1.0);
+        b = vec4(v, v, v, 1.0);
     "#;
 
     const UPDATE: &'static str = r#"
@@ -206,17 +208,18 @@ mod sim_code {
              -VAL(rind, wrap(lind+2, levs), aind) + VAL(rind, wrap(lind+1, levs), aind)*16) +
             (-VAL(rind, lind, wrap(aind-2, angs)) + VAL(rind, lind, wrap(aind-1, angs))*16
              -VAL(rind, lind, wrap(aind+2, angs)) + VAL(rind, lind, wrap(aind+1, angs))*16) +
-            -VAL(rind, lind, aind) * 30) / 12;
+            -VAL(rind, lind, aind) * 90) / 12;
 
         #undef VAL
 
         float x = lookup(tex_v_p, rind, lind, aind).r;
         float v = lookup(tex_b, rind, lind, aind).r;
         float nx = x + v * dt;
-        float nv = v + div2 * dt * 343;
+        float nv = v + div2 * dt * 10;
 
         v_p = vec4(nx, nx, nx, 1.0);
         b = vec4(nv, nv, nv, 1.0);
+        //v_p = vec4(rind/float(rads), lind/float(levs), aind/float(angs), 1.0);
     "#;
 
     const VERT_SHADER: &'static str = r#"
@@ -248,7 +251,7 @@ mod sim_code {
         layout(location = 1) out vec4 b;
 
         vec4 lookup(sampler2D tex, int rind, int lind, int aind) {
-            return texelFetch(tex, ivec2(lind * int(levs) + aind, rind), 0);
+            return texelFetch(tex, ivec2(lind * int(angs) + aind, rind), 0);
         }
 
         vec3 v_f(vec4 v_p) {

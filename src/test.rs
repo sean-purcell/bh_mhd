@@ -10,6 +10,7 @@ fn main() {
     let sim = bh_mhd::Sim::new(&display);
     sim.initial();
 
+    let start_time = time::precise_time_ns();
     let mut prev_time = time::precise_time_ns();
     loop {
         let (dt, cur_time) = {
@@ -17,9 +18,9 @@ fn main() {
             let delta = cur - prev_time;
             prev_time = cur;
             (delta as f32 / (1_000_000_000.0f32),
-             cur as f32 / (1_000_000_000.0f32))
+             (cur-start_time) as f32 / (1_000_000_000.0f32))
         };
-        println!("fps: {}, dt: {}", (1.0f32/dt) as i32, dt);
+        println!("t: {}, fps: {}, dt: {}", cur_time, (1.0f32/dt) as i32, dt);
         sim.iteration(dt, cur_time);
         sim.test_render();
         display.finish();
